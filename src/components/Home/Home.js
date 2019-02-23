@@ -1,5 +1,7 @@
 import React, {Component} from 'react';
-import Popup from "reactjs-popup";
+import axios, {get, post} from 'axios';
+
+// import './Home.css';
 
 class Home extends Component {
 
@@ -15,6 +17,9 @@ class Home extends Component {
 
 	componentDidMount(){
 		var user = JSON.parse(sessionStorage.getItem('userData'));
+		this.setState({email : user['email']})
+		console.log(JSON.parse(sessionStorage.getItem('userData')))
+		console.log(this.state.email)
 		if(user['newUser']){
 			this.addUserToDatabase();
 			this.authenticateAppToAccessDrive();
@@ -27,11 +32,11 @@ class Home extends Component {
 	}
 
 	getListOfGDItems = _ =>{
-		let movies = [];
-		fetch(`http://localhost:4000/searching?search=${this.state.query}&email=${this.state.email}`)
+		var email = JSON.parse(sessionStorage.getItem('userData'))['email']
+		fetch(`http://localhost:4000/searching?successCode=${this.state.successCode}&email=${email}`)
 		.then(response => response.json())
         .then(data => {
-            this.setState({ gdData: data })
+            this.setState({ gdData: data['files'] })
 	    })
 	}
 
@@ -60,8 +65,9 @@ class Home extends Component {
 	}
 
 	authenticateAppToAccessDrive = _ =>{
+		var email = JSON.parse(sessionStorage.getItem('userData'))['email']
 		if (sessionStorage.getItem('userData')){
-			fetch('http://localhost:4000/authenticate')
+			fetch(`http://localhost:4000/authenticate?email=${email}`)
 			.then(response => response.json())
 			.then(({data}) => {
 				console.log(data)
@@ -70,25 +76,62 @@ class Home extends Component {
 		}
 	}
 
-	render() {
-	    return (
+	onChange = (e) => {
+		var email = JSON.parse(sessionStorage.getItem('userData'))['email']
+		let files = e.target.files;
+		let fileName = files[0]['name']
+		let fileType = files[0]['type']
+		let reader = new FileReader();
+		var remove = 'data:'+fileType+';base64,';
+		reader.readAsDataURL(files[0]);	
+		
+		reader.onload = (event) => {
+			var data = event.target.result.replace(remove, '')
+			data = data.replace(' ', '+')
+			const url = "http://localhost:4000/upload"
+			const formData = {file:data, name:fileName, type:fileType, email:email}
+			return post(url, formData)
+			.then(response=>{
+				console.log(response)
+				alert("File uploaded successfully..")
+				window.location.reload()
+			});
+		}
+	}
 
-	    	<div className="row small-up-2 medium-up-3 large-up-4" id="Body">
-        		<div className="medium-12 columns">
-					<h2>Welcome</h2>
-					<h4>{JSON.parse(sessionStorage.getItem('userData'))['name']}</h4>
+//className="medium-12 columns"
+	render() {
+	  return (
+			<div className="row small-up-2 medium-up-3 large-up-4" id="Body">
+					<h2>Welcome {JSON.parse(sessionStorage.getItem('userData'))['name']}... </h2>
 					<div>
-          				<input type="text" placeholder="Provide token and press Enter..."onChange={event => {this.setState({query: event.target.value})}}
-	    						onKeyPress={event => {
-	                			if (event.key === 'Enter') {
-	                  				this.getListOfGDItems()
-	                			}
-              				}}
+          	<input type="text" 
+          		placeholder="Search..."
+          		onChange={event => {this.setState({successCode: event.target.value})}}
+	    				onKeyPress={event => {
+	              if (event.key === 'Enter') {
+	                this.getListOfGDItems()
+	              }
+              }}
 						/>
+						<h1> Upload file to Google Drive </h1>
+	    			<input type="file" name="file" onChange={(e)=>this.onChange(e)}/>
+						<h4>Bellow is list of your 10 files...</h4>
+	    			<ul>
+		    			{this.state.gdData.map(item => 
+		    				<MyAppChild 
+		    					key={item.id} 
+		    					email={this.state.email}  
+		    					name={item.name} 
+		    					id={item.id} 
+		    					download={item.webContentLink} 
+		    					view={item.webViewLink} 
+		    					thumbnail={item.thumbnailLink} 
+		    				/>
+		    			)}
+	    			</ul>
 					</div>
-        		</div>
-	    	<ul>{this.state.gdData.map(item => <MyAppChild key={item.id} email={this.state.email}  name={item.name} id={item.id} />)}</ul>
-			</div>
+      	</div>
 	    	)
 	  }
 }
@@ -102,24 +145,28 @@ class MyAppChild extends Component {
         	value: ''
 		}
 	}
-  	deleteOneItemFromGD = (id) =>{
+  deleteOneItemFromGD = (id) =>{
 		fetch(`http://localhost:4000/delete?id=${id}&email=${this.props.email}`)
 		.then(response => response.json())
         .then(data => {
         	alert(JSON.stringify(data))
+        	window.location.reload();
 	    })
-	    //window.location.reload()
 	}
 
   render() {
     return (
     	<div>
-	    	<li>{this.props.id + " -> " +this.props.name}  
-		    	<form onSubmit = {this.handleSubmit}>
-		    	
+		    <form onSubmit = {this.handleSubmit}>
+	    	<ul>
+		    <a href={this.props.view}>
+		    <img src={this.props.thumbnail} width="100" height="100"/>
+		    </a>
+		    	{this.props.name}
 			    <input value='delete' type='button' onClick={this.deleteOneItemFromGD.bind(this, this.props.id)}/>
+			    <a href={this.props.download}> Download </a>
+	    	</ul>
 		    	</form>
-	    	</li>
 	    </div>
     	)
   }

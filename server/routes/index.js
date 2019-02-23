@@ -3,6 +3,7 @@ const cors = require('cors');
 const mysql = require('mysql');
 var opn = require('opn');
 var redis = require('redis');
+var Readable = require('stream').Readable
 const fs = require('fs');
 const readline = require('readline');
 const {google} = require('googleapis');
@@ -78,10 +79,17 @@ router.get('/users', cors(), function(req, res, next){
   })
 });
 
+router.post('/upload', function(req, res, next){
+  authorize(auth, false, "", req.body['email'], req.body, uploadFiles).then(resp => {
+    //console.log(resp.status)
+    res.send(resp)
+  });
+});
+
 // delete file from google drive
 router.get('/delete', cors(), function(req, res, next){
   const { id, email } = req.query
-  authorize(auth, false, id, email, deleteFiles).then(resp => {
+  authorize(auth, false, id, email, "hi", deleteFiles).then(resp => {
     if(resp.error){
       res.json({data:resp.errors})
     }else if(resp.data){
@@ -94,20 +102,149 @@ router.get('/delete', cors(), function(req, res, next){
 
 // Authentication for google drive
 router.get('/authenticate', cors(), function(req, res, next){
-  authorize(auth, true, "", "dummydata", listFiles).then(files => {
+  const { email } = req.query
+  authorize(auth, true, "", email, "hi", listFiles).then(files => {
     res.send("authenticated")
   });
 });
 
 // Searching file in google drive
 router.get('/searching', cors(), function(req, res, next){
-  const { search, email } = req.query
-  authorize(auth, false, search, email, listFiles).then(files => {
+  const { successCode, email } = req.query
+  authorize(auth, false, successCode, email, "hi", listFiles).then(files => {
     res.send(files)
   });
 });
 
-const deleteFiles = (auth, id) => {
+const authorize = (credentials, drive, code, email, body, callback) => {
+  return new Promise((resolve, reject) => {
+    const {client_secret, client_id, redirect_uris} = credentials.installed;
+    const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
+
+    redis_client.get(email, (err, token)=>{
+      if (err || token==null) {
+        console.log("No token exists");
+        getAccessToken(oAuth2Client, drive, code, email, body, callback).then(files => {
+          resolve(files)
+        });
+      } else {
+        console.log("Found Previous Token")
+        oAuth2Client.setCredentials(JSON.parse(token));
+        callback(oAuth2Client, code, body).then(resp => {
+          resolve(resp)
+        })
+        .catch(error => {
+          console.log("In the error block")
+          console.log(error)
+          reject(error)
+        })
+      }
+
+    });
+  })
+}
+
+const getAccessToken = (oAuth2Client, drive, code, email, body, callback) => {
+  return new Promise((resolve, reject) => {
+    console.log("Authenticating....")
+    const authUrl = oAuth2Client.generateAuthUrl({
+      access_type: 'offline',
+      scope: SCOPES,
+    });
+    console.log('Authorize this app by visiting this url:');
+
+    // remove this drive conditio if possible
+    if(drive){
+      opn(authUrl)
+    } 
+    if (drive){
+      // put reject instead of return 
+      return console.error("create token");
+    }
+
+    oAuth2Client.getToken(code, (err, token) => {
+      if (err) {
+        console.error('Error retrieving access token');
+        reject('Error retrieving access token', err) 
+      }
+      oAuth2Client.setCredentials(token);
+      redis_client.psetex(email, token['expiry_date'], JSON.stringify(token), (err, resp)=>{
+        if(err){
+          console.log(err)
+        }else{
+          console.log(resp)
+        }
+      });
+      callback(oAuth2Client, code, body).then(files => {
+        resolve(files)
+      })
+      .catch(error => {
+        console.log("In the error block")
+        console.log(error)
+        reject(error)
+      })
+    });
+  })
+}
+
+const listFiles = (auth, code, body) => {
+  return new Promise((resolve, reject) => {
+    const drive = google.drive({version: 'v3', auth});
+    drive.files.list({
+      pageSize: 10,
+      fields: 'nextPageToken, files(webContentLink, webViewLink, thumbnailLink, id, name)',
+    }, (err, res) => {
+      if (err) {
+        console.log('The API returned an error: ' + err);
+        reject("No files found")
+      } 
+      const files = res.data.files;
+      console.log(res.data)
+      if (files.length) {
+        console.log('Files:');
+        console.log("Got the data from drive. Returning....")
+        console.log(files)
+        resolve(res.data)
+      } else {
+        console.log('No files found.');
+        reject("No files found")
+      }
+    });
+  });
+};
+
+const uploadFiles = (auth, code, body) => {
+  return new Promise((resolve, reject) => {
+
+    const imgBuffer = Buffer.from(body['file'], 'base64')
+    var s = new Readable()
+    s.push(imgBuffer)   
+    s.push(null)
+
+    const drive = google.drive({version: 'v3', auth});
+    var fileMetadata = {
+      'name': body['name']
+    };
+    var media = {
+      mimeType: body['type'],
+      body: s
+    };
+    drive.files.create({
+      resource: fileMetadata,
+      media: media,
+      fields: 'id'
+    }, (err, res) => {
+      if (err) {
+        console.log('The API returned an error: ' + err);
+        reject("No files found")
+      } else{
+        resolve(res.status)
+      }
+    });
+  });
+};
+
+const deleteFiles = (auth, id, body) => {
   return new Promise((resolve, reject) => {
     const drive = google.drive({version: 'v3', auth});
     drive.files.delete({
@@ -122,101 +259,6 @@ const deleteFiles = (auth, id) => {
         console.log('The API returned an error: ' + err);
         reject("No files found")
       } 
-    });
-  });
-};
-
-
-const authorize = (credentials, drive, code, email, callback) => {
-  return new Promise((resolve, reject) => {
-    const {client_secret, client_id, redirect_uris} = credentials.installed;
-    const oAuth2Client = new google.auth.OAuth2(
-    client_id, client_secret, redirect_uris[0]);
-
-    redis_client.get(email, (err, token)=>{
-      if (err || token==null) {
-        console.log("No token exists");
-        getAccessToken(oAuth2Client, drive, code, email, callback).then(files => {
-          resolve(files)
-        });
-      } else {
-        console.log("Found Previous Token")
-        oAuth2Client.setCredentials(JSON.parse(token));
-        callback(oAuth2Client, code).then(resp => {
-          resolve(resp)
-        })
-        .catch(error => {
-          console.log("In the error block")
-          console.log(error)
-          reject(error)
-        })
-      }
-
-    });
-  })
-}
-
-const getAccessToken = (oAuth2Client, drive, code, email, callback) => {
-  return new Promise((resolve, reject) => {
-    console.log("Authenticating....")
-    const authUrl = oAuth2Client.generateAuthUrl({
-      access_type: 'offline',
-      scope: SCOPES,
-    });
-    console.log('Authorize this app by visiting this url:');
-    if(drive){
-      opn(authUrl)
-    } 
-    if (drive) return console.error("create token")
-    oAuth2Client.getToken(code, (err, token) => {
-      if (err) {
-        console.error('Error retrieving access token');
-        reject('Error retrieving access token', err) 
-      }
-      oAuth2Client.setCredentials(token);
-      redis_client.psetex(email, token['expiry_date'], JSON.stringify(token), (err, resp)=>{
-        if(err){
-          console.log(err)
-        }else{
-          console.log(resp)
-        }
-      });
-      callback(oAuth2Client, code).then(files => {
-        resolve(files)
-      })
-      .catch(error => {
-        console.log("In the error block")
-        console.log(error)
-        reject(error)
-      })
-    });
-  })
-}
-
-const listFiles = (auth, code) => {
-  return new Promise((resolve, reject) => {
-    const drive = google.drive({version: 'v3', auth});
-    drive.files.list({
-      pageSize: 10,
-      fields: 'nextPageToken, files(id, name)',
-    }, (err, res) => {
-      if (err) {
-        console.log('The API returned an error: ' + err);
-        return
-      } 
-      const files = res.data.files;
-      if (files.length) {
-        console.log('Files:');
-        // files.map((file) => {
-        //   console.log(`${file.name} (${file.id})`);
-        // });
-        console.log("Got the data from drive. Returning....")
-        console.log(files)
-        resolve(files)
-      } else {
-        console.log('No files found.');
-        reject("No files found")
-      }
     });
   });
 };
