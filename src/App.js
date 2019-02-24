@@ -1,8 +1,9 @@
 import React, { Component } from 'react';
 import './styles/foundation.min.css';
 import './styles/custom.css';
+
 import Routes from './routes';
-import Header from './components/Header/Header';
+import Header from './components/Header';
 
 class App extends Component {
 
