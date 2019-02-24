@@ -1,28 +1,24 @@
-.App {
-  text-align: center;
+.succsessCode, .uploadFile, .fileList{
+  border: .5px solid #444444;
+  margin: 10px;
+  padding: 10px;
 }
-
-.App-logo {
-  animation: App-logo-spin infinite 20s linear;
-  height: 80px;
+tr{
+  margin: 10px;
+  border: 1px solid #f2b632;
+  border-radius: 15px;
+  width: 80px;
 }
-
-.App-header {
-  background-color: #222;
-  height: 150px;
-  padding: 20px;
-  color: white;
+td{
+  padding: 10px;
 }
-
-.App-title {
-  font-size: 1.5em;
+input{
+  padding: 10px;
+  margin: 10px;
 }
-
-.App-intro {
-  font-size: large;
+a{
+  color: #f2b632;
 }
-
-@keyframes App-logo-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+img{
+  border: 2px solid #f2b632;
 }
