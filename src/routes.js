@@ -1,14 +1,14 @@
 import React from 'react';
-import {BrowserRouter,  Route, Redirect, Switch} from 'react-router-dom';
+import {BrowserRouter, Route, Switch} from 'react-router-dom';
 
-import Welcome from '././components/Welcome/Welcome';
-import Home from '././components/Home/Home';
+import Login from '././components/Login';
+import Home from '././components/Home';
 
 const Routes = () => (
-  <BrowserRouter >
+  <BrowserRouter>
       <Switch>
           {/* Base path - http://localhost:3000/*/}
-          <Route exact path="/" component={Welcome}/>
+          <Route exact path="/" component={Login}/>
           {/* After succesful login, redirect to - http://localhost:3000/home */}
           <Route path="/home" component={Home}/>
       </Switch>
@@ -16,3 +16,4 @@ const Routes = () => (
 );
 
 export default Routes;
+
