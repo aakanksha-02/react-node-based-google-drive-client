@@ -4,13 +4,10 @@ const mysql = require('mysql');
 var opn = require('opn');
 var redis = require('redis');
 var Readable = require('stream').Readable
-const fs = require('fs');
-const readline = require('readline');
 const {google} = require('googleapis');
 const app = express();
 const SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly','https://www.googleapis.com/auth/drive.appdata','https://www.googleapis.com/auth/drive'];
 
-const TOKEN_PATH = 'token1.json';
 const auth = {"installed":{"client_id":"275400908677-jp3q4k5rn32q6lp72kigvsk6rcvf9jb6.apps.googleusercontent.com","project_id":"quickstart-1549564581878","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs","client_secret":"JV2rur8bFOVAQL572go0jm6o","redirect_uris":["urn:ietf:wg:oauth:2.0:oob","http://localhost"]}}
 
 var router = express.Router();
@@ -20,7 +17,7 @@ const connection = mysql.createConnection({
   host:'localhost',
   user:'root',
   password:'root',
-  database:'cyrene'
+  database:'akki'
 });
 connection.connect(err=>{
   return err;
