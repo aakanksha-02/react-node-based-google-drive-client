@@ -1,5 +1,8 @@
-<!-- Google drive client in React -->
+<!-- Google drive client in React and Node -->
 # Google Drive Client #
+
+### What is it?
+This is a google drive client using React(as frontend) and node(as backend). This client application integrates features like google authentication and CRUD operation(Upload/View/Delete/Details) with google drive files.
 
 ### Dependencies
 1. mySQL - For storing the user details
